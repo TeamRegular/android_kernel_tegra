@@ -1694,7 +1694,13 @@ if (0)	cardhu_pmon_init();
 #elif defined CONFIG_BLUEDROID_PM
 	cardhu_setup_bluedroid_pm();
 #endif
-	cardhu_sata_init();
+	/*
+	 * if you want to add support for SATA in your board
+	 * then add your board check here like
+	 * board_info.board_id == BOARD_E1186
+	 */
+	if (board_info.board_id == BOARD_PM315)
+		cardhu_sata_init();
 	//audio_wired_jack_init();
 	cardhu_pins_state_init();
 	cardhu_emc_init();
