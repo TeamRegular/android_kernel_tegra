@@ -87,7 +87,8 @@ static int cardhu_camera_init(void)
 	/* Boards E1198 and E1291 are of Cardhu personality
 	 * and donot have TCA6416 exp for camera */
 	if ((board_info.board_id == BOARD_E1198) ||
-		(board_info.board_id == BOARD_E1291)) {
+		(board_info.board_id == BOARD_E1291) ||
+		(board_info.board_id == BOARD_PM315)) {
 		ret = gpio_request(CAM1_POWER_DWN_GPIO, "camera_power_en");
 		if (ret < 0)
 			pr_err("%s: gpio_request failed for gpio %s\n",
@@ -136,7 +137,8 @@ static int cardhu_left_ov5650_power_on(void)
 	/* Boards E1198 and E1291 are of Cardhu personality
 	 * and donot have TCA6416 exp for camera */
 	if ((board_info.board_id == BOARD_E1198) ||
-		(board_info.board_id == BOARD_E1291)) {
+		(board_info.board_id == BOARD_E1291) ||
+		(board_info.board_id == BOARD_PM315)) {
 
 		if (cardhu_vdd_2v8_cam1 == NULL) {
 			cardhu_vdd_2v8_cam1 = regulator_get(NULL, "vdd_2v8_cam1");
@@ -163,7 +165,8 @@ static int cardhu_left_ov5650_power_on(void)
 
 	mdelay(5);
 	if ((board_info.board_id == BOARD_E1198) ||
-		(board_info.board_id == BOARD_E1291)) {
+		(board_info.board_id == BOARD_E1291) ||
+		(board_info.board_id == BOARD_PM315)) {
 		gpio_direction_output(CAM1_POWER_DWN_GPIO, 0);
 		mdelay(20);
 		gpio_direction_output(OV5650_RESETN_GPIO, 0);
@@ -198,7 +201,8 @@ static int cardhu_left_ov5650_power_off(void)
 	/* Boards E1198 and E1291 are of Cardhu personality
 	 * and donot have TCA6416 exp for camera */
 	if ((board_info.board_id == BOARD_E1198) ||
-		(board_info.board_id == BOARD_E1291)) {
+		(board_info.board_id == BOARD_E1291) ||
+		(board_info.board_id == BOARD_PM315)) {
 		gpio_direction_output(CAM1_POWER_DWN_GPIO, 1);
 		gpio_direction_output(CAM2_POWER_DWN_GPIO, 1);
 		gpio_direction_output(CAM3_POWER_DWN_GPIO, 1);
@@ -280,7 +284,8 @@ static int cardhu_right_ov5650_power_on(void)
 	/* Boards E1198 and E1291 are of Cardhu personality
 	 * and donot have TCA6416 exp for camera */
 	if ((board_info.board_id == BOARD_E1198) ||
-		(board_info.board_id == BOARD_E1291)) {
+		(board_info.board_id == BOARD_E1291) ||
+		(board_info.board_id == BOARD_PM315)) {
 
 		gpio_direction_output(CAM1_POWER_DWN_GPIO, 0);
 		gpio_direction_output(CAM2_POWER_DWN_GPIO, 0);
@@ -341,7 +346,8 @@ static int cardhu_right_ov5650_power_off(void)
 	/* Boards E1198 and E1291 are of Cardhu personality
 	 * and do not have TCA6416 for camera */
 	if ((board_info.board_id == BOARD_E1198) ||
-		(board_info.board_id == BOARD_E1291)) {
+		(board_info.board_id == BOARD_E1291) ||
+		(board_info.board_id == BOARD_PM315)) {
 		gpio_direction_output(CAM1_POWER_DWN_GPIO, 1);
 		gpio_direction_output(CAM2_POWER_DWN_GPIO, 1);
 		gpio_direction_output(CAM3_POWER_DWN_GPIO, 1);
@@ -362,8 +368,8 @@ static void cardhu_ov5650_synchronize_sensors(void)
 		mdelay(50);
 		gpio_direction_output(CAM1_POWER_DWN_GPIO, 0);
 		mdelay(50);
-	}
-	else if (board_info.board_id == BOARD_E1291) {
+	} else if ((board_info.board_id == BOARD_E1291) ||
+			(board_info.board_id == BOARD_PM315)) {
 		gpio_direction_output(CAM1_POWER_DWN_GPIO, 1);
 		gpio_direction_output(CAM2_POWER_DWN_GPIO, 1);
 		mdelay(50);
@@ -400,7 +406,8 @@ static int cardhu_ov2710_power_on(void)
 	/* Boards E1198 and E1291 are of Cardhu personality
 	 * and do not have TCA6416 for camera */
 	if ((board_info.board_id == BOARD_E1198) ||
-		(board_info.board_id == BOARD_E1291)) {
+		(board_info.board_id == BOARD_E1291) ||
+		(board_info.board_id == BOARD_PM315)) {
 		if (cardhu_vdd_cam3 == NULL) {
 			cardhu_vdd_cam3 = regulator_get(NULL, "vdd_cam3");
 			if (WARN_ON(IS_ERR(cardhu_vdd_cam3))) {
@@ -445,7 +452,8 @@ static int cardhu_ov2710_power_off(void)
 	/* Boards E1198 and E1291 are of Cardhu personality
 	 * and donot have TCA6416 exp for camera */
 	if ((board_info.board_id == BOARD_E1198) ||
-		(board_info.board_id == BOARD_E1291)) {
+		(board_info.board_id == BOARD_E1291) ||
+		(board_info.board_id == BOARD_PM315)) {
 		gpio_direction_output(CAM1_POWER_DWN_GPIO, 1);
 		gpio_direction_output(CAM2_POWER_DWN_GPIO, 1);
 		gpio_direction_output(CAM3_POWER_DWN_GPIO, 1);
@@ -472,7 +480,8 @@ static int cardhu_ov5640_power_on(void)
 	/* Boards E1198 and E1291 are of Cardhu personality
 	 * and donot have TCA6416 exp for camera */
 	if ((board_info.board_id == BOARD_E1198) ||
-		(board_info.board_id == BOARD_E1291)) {
+		(board_info.board_id == BOARD_E1291) ||
+		(board_info.board_id == BOARD_PM315)) {
 
 		gpio_direction_output(CAM1_POWER_DWN_GPIO, 0);
 		gpio_direction_output(CAM2_POWER_DWN_GPIO, 0);
@@ -525,7 +534,8 @@ static int cardhu_ov5640_power_off(void)
 	/* Boards E1198 and E1291 are of Cardhu personality
 	 * and donot have TCA6416 exp for camera */
 	if ((board_info.board_id == BOARD_E1198) ||
-		(board_info.board_id == BOARD_E1291)) {
+		(board_info.board_id == BOARD_E1291) ||
+		(board_info.board_id == BOARD_PM315)) {
 		gpio_direction_output(CAM1_POWER_DWN_GPIO, 1);
 		gpio_direction_output(CAM2_POWER_DWN_GPIO, 1);
 		gpio_direction_output(CAM3_POWER_DWN_GPIO, 1);
@@ -792,7 +802,8 @@ static int cardhu_nct1008_init(void)
 		(board_info.board_id == BOARD_E1257) ||
 		(board_info.board_id == BOARD_PM269) ||
 		(board_info.board_id == BOARD_PM305) ||
-		(board_info.board_id == BOARD_PM311)) {
+		(board_info.board_id == BOARD_PM311) ||
+		(board_info.board_id == BOARD_PM315)) {
 		nct1008_port = TEGRA_GPIO_PCC2;
 	} else if ((board_info.board_id == BOARD_E1186) ||
 		(board_info.board_id == BOARD_E1187) ||
@@ -1044,7 +1055,7 @@ if (0) {
 	if (board_info.sku == BOARD_SKU_B11)
 		i2c_register_board_info(2, cardhu_i2c2_ltr_board_info,
 			ARRAY_SIZE(cardhu_i2c2_ltr_board_info));
-	else
+	else if (board_info.board_id != BOARD_PM315)
 		i2c_register_board_info(2, cardhu_i2c2_isl_board_info,
 			ARRAY_SIZE(cardhu_i2c2_isl_board_info));
 }
@@ -1100,19 +1111,20 @@ int __init cardhu_ov5650_late_init(void)
 		return 0;
 
 	if ((board_info.board_id == BOARD_E1198) ||
-		(board_info.board_id == BOARD_E1291))
+		(board_info.board_id == BOARD_E1291) ||
+		(board_info.board_id == BOARD_PM315))
 		return 0;
 
-	printk("%s: \n", __func__);
+	printk(KERN_INFO "%s:\n", __func__);
 	for (i = 0; i < ARRAY_SIZE(ov5650_gpio_keys); i++) {
 		ret = gpio_request(ov5650_gpio_keys[i].gpio,
 			ov5650_gpio_keys[i].name);
 		if (ret < 0) {
-			printk("%s: gpio_request failed for gpio #%d\n",
+			printk(KERN_INFO "%s: gpio_request failed for gpio #%d\n",
 				__func__, i);
 			goto fail;
 		}
-		printk("%s: enable - %d\n", __func__, i);
+		printk(KERN_INFO "%s: enable - %d\n", __func__, i);
 		gpio_direction_output(ov5650_gpio_keys[i].gpio,
 			ov5650_gpio_keys[i].enabled);
 		gpio_export(ov5650_gpio_keys[i].gpio, false);
