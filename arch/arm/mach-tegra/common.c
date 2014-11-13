@@ -30,11 +30,13 @@
 #include <linux/sched.h>
 #include <linux/cpufreq.h>
 #include <linux/of.h>
+#include <linux/sys_soc.h>
 
 #include <asm/hardware/cache-l2x0.h>
 #include <asm/system.h>
 
 #include <mach/gpio.h>
+#include <mach/hardware.h>
 #include <mach/iomap.h>
 #include <mach/pinmux.h>
 #include <mach/powergate.h>
@@ -1002,26 +1004,14 @@ char *cpufreq_conservative_gov = "conservative";
 void cpufreq_store_default_gov(void)
 {
 	unsigned int cpu = 0;
-	struct cpufreq_policy *policy;
 
 #ifndef CONFIG_TEGRA_AUTO_HOTPLUG
 	for_each_online_cpu(cpu)
 #endif
 	{
-		policy = cpufreq_cpu_get(cpu);
-		if (policy && policy->governor) {
-			sprintf(cpufreq_default_gov[cpu], "%s",
-					policy->governor->name);
-			cpufreq_cpu_put(policy);
-		} else {
-			/* No policy or no gov set for this
-			 * online cpu. If we are here, require
-			 * serious debugging hence setting
-			 * as pr_error.
-			 */
-			pr_err("No gov or No policy for online cpu:%d,"
-					, cpu);
-		}
+		if (cpufreq_current_gov(cpufreq_default_gov[cpu], cpu) < 0)
+			pr_info("Unable to fetch gov:%s for online cpu:%d\n"
+				, cpufreq_default_gov[cpu], cpu);
 	}
 }
 
@@ -1039,7 +1029,7 @@ void cpufreq_change_gov(char *target_gov)
 			/* Unable to set gov for the online cpu.
 			 * If it happens, needs to debug.
 			 */
-			pr_info("Unable to set gov:%s for online cpu:%d,"
+			pr_info("Unable to set gov:%s for online cpu:%d"
 				, cpufreq_default_gov[cpu]
 					, cpu);
 	}
@@ -1062,7 +1052,7 @@ void cpufreq_restore_default_gov(void)
 				 * It was online on suspend and becomes
 				 * offline on resume.
 				 */
-				pr_info("Unable to restore gov:%s for cpu:%d,"
+				pr_info("Unable to restore gov:%s for cpu:%d"
 						, cpufreq_default_gov[cpu]
 							, cpu);
 		}

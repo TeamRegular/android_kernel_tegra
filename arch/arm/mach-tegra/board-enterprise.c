@@ -70,38 +70,108 @@
 #include "fuse.h"
 #include "pm.h"
 
+#ifdef CONFIG_TEGRA_THERMAL_THROTTLE
+static struct throttle_table throttle_freqs_tj[] = {
+	      /*    CPU,    CBUS,    SCLK,     EMC */
+	      { 1000000,  NO_CAP,  NO_CAP,  NO_CAP },
+	      {  760000,  NO_CAP,  NO_CAP,  NO_CAP },
+	      {  760000,  NO_CAP,  NO_CAP,  NO_CAP },
+	      {  620000,  NO_CAP,  NO_CAP,  NO_CAP },
+	      {  620000,  NO_CAP,  NO_CAP,  NO_CAP },
+	      {  620000,  437000,  NO_CAP,  NO_CAP },
+	      {  620000,  352000,  NO_CAP,  NO_CAP },
+	      {  475000,  352000,  NO_CAP,  NO_CAP },
+	      {  475000,  352000,  NO_CAP,  NO_CAP },
+	      {  475000,  352000,  250000,  375000 },
+	      {  475000,  352000,  250000,  375000 },
+	      {  475000,  247000,  204000,  375000 },
+	      {  475000,  247000,  204000,  204000 },
+	      {  475000,  247000,  204000,  204000 },
+	{ CPU_THROT_LOW,  247000,  204000,  102000 },
+};
+#endif
+
+#ifdef CONFIG_TEGRA_SKIN_THROTTLE
+static struct throttle_table throttle_freqs_tskin[] = {
+	      /*    CPU,    CBUS,    SCLK,     EMC */
+	      { 1000000,  NO_CAP,  NO_CAP,  NO_CAP },
+	      {  760000,  NO_CAP,  NO_CAP,  NO_CAP },
+	      {  760000,  NO_CAP,  NO_CAP,  NO_CAP },
+	      {  620000,  NO_CAP,  NO_CAP,  NO_CAP },
+	      {  620000,  NO_CAP,  NO_CAP,  NO_CAP },
+	      {  620000,  437000,  NO_CAP,  NO_CAP },
+	      {  620000,  352000,  NO_CAP,  NO_CAP },
+	      {  475000,  352000,  NO_CAP,  NO_CAP },
+	      {  475000,  352000,  NO_CAP,  NO_CAP },
+	      {  475000,  352000,  250000,  375000 },
+	      {  475000,  352000,  250000,  375000 },
+	      {  475000,  247000,  204000,  375000 },
+	      {  475000,  247000,  204000,  204000 },
+	      {  475000,  247000,  204000,  204000 },
+	{ CPU_THROT_LOW,  247000,  204000,  102000 },
+};
+#endif
+
 static struct balanced_throttle throttle_list[] = {
+#ifdef CONFIG_TEGRA_THERMAL_THROTTLE
 	{
 		.id = BALANCED_THROTTLE_ID_TJ,
-		.throt_tab_size = 10,
-		.throt_tab = {
-			{      0, 1000 },
-			{ 640000, 1000 },
-			{ 640000, 1000 },
-			{ 640000, 1000 },
-			{ 640000, 1000 },
-			{ 640000, 1000 },
-			{ 760000, 1000 },
-			{ 760000, 1050 },
-			{1000000, 1050 },
-			{1000000, 1100 },
-		},
+		.throt_tab_size = ARRAY_SIZE(throttle_freqs_tj),
+		.throt_tab = throttle_freqs_tj,
 	},
+#endif
 #ifdef CONFIG_TEGRA_SKIN_THROTTLE
 	{
 		.id = BALANCED_THROTTLE_ID_SKIN,
-		.throt_tab_size = 6,
-		.throt_tab = {
-			{ 640000, 1200 },
-			{ 640000, 1200 },
-			{ 760000, 1200 },
-			{ 760000, 1200 },
-			{1000000, 1200 },
-			{1000000, 1200 },
-		},
+		.throt_tab_size = ARRAY_SIZE(throttle_freqs_tskin),
+		.throt_tab = throttle_freqs_tskin,
 	},
 #endif
 };
+
+#ifdef CONFIG_TEGRA_SKIN_THROTTLE
+/* Skin timer trips */
+static struct tegra_thermal_timer_trip skin_therm_timer_trips[] = {
+	/* duration,  temp, hysteresis */
+	{       600, 48000, 5000 },
+	{      1800, 45000, 5000 },
+	{        -1, 43000, 8000 }, /* The duration -1 equals infinity. */
+};
+
+/* Skin active throttle size must be one. */
+static struct throttle_table throttle_freqs_tskin_active_0[] = {
+	      /*    CPU,    CBUS,    SCLK,     EMC */
+	      { 1200000,  NO_CAP,  NO_CAP,  NO_CAP },
+};
+
+static struct throttle_table throttle_freqs_tskin_active_1[] = {
+	      /*    CPU,    CBUS,    SCLK,     EMC */
+	      { 1000000,  NO_CAP,  NO_CAP,  NO_CAP },
+};
+
+static struct skin_therm_active_throttle skin_therm_actives[] = {
+	{
+		.bthrot = {
+			.id = BALANCED_THROTTLE_ID_SKIN + 1,
+			.throt_tab_size =
+				ARRAY_SIZE(throttle_freqs_tskin_active_0),
+			.throt_tab = throttle_freqs_tskin_active_0,
+		},
+		.trip_temp = 33000,
+		.hysteresis = 0,
+	},
+	{
+		.bthrot = {
+			.id = BALANCED_THROTTLE_ID_SKIN + 2,
+			.throt_tab_size =
+				ARRAY_SIZE(throttle_freqs_tskin_active_1),
+			.throt_tab = throttle_freqs_tskin_active_1,
+		},
+		.trip_temp = 38000,
+		.hysteresis = 0,
+	},
+};
+#endif
 
 /* All units are in millicelsius */
 static struct tegra_thermal_data thermal_data = {
@@ -123,6 +193,13 @@ static struct tegra_thermal_data thermal_data = {
 #ifdef CONFIG_TEGRA_SKIN_THROTTLE
 	.skin_device_id = THERMAL_DEVICE_ID_SKIN,
 	.temp_throttle_skin = 43000,
+	.skin_timer_trip_data = {
+		.trips = skin_therm_timer_trips,
+		.trip_size = ARRAY_SIZE(skin_therm_timer_trips),
+	},
+
+	.skin_actives = skin_therm_actives,
+	.skin_active_size = ARRAY_SIZE(skin_therm_actives),
 #endif
 };
 
@@ -152,6 +229,8 @@ static noinline void __init enterprise_bt_st(void)
 	platform_device_register(&wl128x_device);
 	platform_device_register(&btwilink_device);
 }
+
+#ifdef CONFIG_BT_BLUESLEEP
 static struct rfkill_gpio_platform_data enterprise_bt_rfkill_pdata[] = {
 	{
 		.name           = "bt_rfkill",
@@ -229,7 +308,55 @@ static void __init enterprise_setup_bluesleep(void)
 		platform_device_register(&enterprise_brcm_bluesleep_device);
 	return;
 }
+#elif defined CONFIG_BLUEDROID_PM
+static struct resource enterprise_bluedroid_pm_resources[] = {
+	[0] = {
+		.name   = "shutdown_gpio",
+		.start  = TEGRA_GPIO_PE6,
+		.end    = TEGRA_GPIO_PE6,
+		.flags  = IORESOURCE_IO,
+	},
+	[1] = {
+		.name = "host_wake",
+		.flags  = IORESOURCE_IRQ | IORESOURCE_IRQ_HIGHEDGE,
+	},
+	[2] = {
+		.name = "gpio_ext_wake",
+		.start  = TEGRA_GPIO_PE7,
+		.end    = TEGRA_GPIO_PE7,
+		.flags  = IORESOURCE_IO,
+	},
+	[3] = {
+		.name = "gpio_host_wake",
+		.start  = TEGRA_GPIO_PS2,
+		.end    = TEGRA_GPIO_PS2,
+		.flags  = IORESOURCE_IO,
+	},
+};
 
+static struct platform_device enterprise_bluedroid_pm_device = {
+	.name = "bluedroid_pm",
+	.id             = 0,
+	.num_resources  = ARRAY_SIZE(enterprise_bluedroid_pm_resources),
+	.resource       = enterprise_bluedroid_pm_resources,
+};
+
+static void __init enterprise_bluedroid_pm(void)
+{
+	struct board_info board_info;
+	tegra_get_board_info(&board_info);
+
+	enterprise_bluedroid_pm_resources[1].start =
+		enterprise_bluedroid_pm_resources[1].end =
+				gpio_to_irq(TEGRA_GPIO_PS2);
+	if (board_info.board_id == BOARD_E1239)
+		enterprise_bluedroid_pm_resources[1].start =
+			enterprise_bluedroid_pm_resources[1].end =
+							TEGRA_GPIO_PF4;
+	platform_device_register(&enterprise_bluedroid_pm_device);
+	return;
+}
+#endif
 static __initdata struct tegra_clk_init_table enterprise_clk_init_table[] = {
 	/* name		parent		rate		enabled */
 	{ "pll_m",	NULL,		0,		false},
@@ -241,14 +368,15 @@ static __initdata struct tegra_clk_init_table enterprise_clk_init_table[] = {
 	{ "i2s1",	"pll_a_out0",	0,		false},
 	{ "i2s3",	"pll_a_out0",	0,		false},
 	{ "spdif_out",	"pll_a_out0",	0,		false},
-	{ "d_audio",	"clk_m",	12000000,	false},
-	{ "dam0",	"clk_m",	12000000,	false},
-	{ "dam1",	"clk_m",	12000000,	false},
-	{ "dam2",	"clk_m",	12000000,	false},
+	{ "d_audio",	"clk_m",	13000000,	false},
+	{ "dam0",	"clk_m",	13000000,	false},
+	{ "dam1",	"clk_m",	13000000,	false},
+	{ "dam2",	"clk_m",	13000000,	false},
 	{ "audio0",	"i2s0_sync",	0,		false},
 	{ "audio1",	"i2s1_sync",	0,		false},
 	{ "audio2",	"i2s2_sync",	0,		false},
 	{ "audio3",	"i2s3_sync",	0,		false},
+	{ "audio4",	"i2s4_sync",	0,		false},
 	{ "vi",		"pll_p",	0,		false},
 	{ "vi_sensor",	"pll_p",	0,		false},
 	{ "i2c5",	"pll_p",	3200000,	false},
@@ -575,6 +703,17 @@ static void __init enterprise_uart_init(void)
 	platform_add_devices(enterprise_uart_devices,
 				ARRAY_SIZE(enterprise_uart_devices));
 }
+/* add vibrator for enterprise */
+static struct platform_device vibrator_device = {
+	.name = "tegra-vibrator",
+	.id = -1,
+};
+
+static noinline void __init enterprise_vibrator_init(void)
+{
+	platform_device_register(&vibrator_device);
+}
+
 
 static struct resource tegra_rtc_resources[] = {
 	[0] = {
@@ -614,6 +753,7 @@ static struct tegra_asoc_platform_data enterprise_audio_pdata = {
 		.is_i2s_master	= 0,
 		.i2s_mode	= TEGRA_DAIFMT_I2S,
 		.sample_size	= 16,
+		.channels	    = 2,
 	},
 	.i2s_param[BASEBAND]	= {
 		.is_i2s_master	= 1,
@@ -621,6 +761,7 @@ static struct tegra_asoc_platform_data enterprise_audio_pdata = {
 		.sample_size	= 16,
 		.rate		= 8000,
 		.channels	= 1,
+		.bit_clk    = 2048000,
 	},
 	.i2s_param[BT_SCO]	= {
 		.audio_port_id	= 3,
@@ -1138,8 +1279,10 @@ static void __init tegra_enterprise_init(void)
 	enterprise_i2c_init();
 	enterprise_uart_init();
 	enterprise_usb_init();
+#ifdef CONFIG_BT_BLUESLEEP
 	if (board_info.board_id == BOARD_E1239)
 		enterprise_bt_rfkill_pdata[0].reset_gpio = TEGRA_GPIO_PF4;
+#endif
 	platform_add_devices(enterprise_devices, ARRAY_SIZE(enterprise_devices));
 	tegra_ram_console_debug_init();
 	enterprise_regulator_init();
@@ -1157,14 +1300,19 @@ static void __init tegra_enterprise_init(void)
 	if (tegra_get_commchip_id() == COMMCHIP_TI_WL18XX)
 		enterprise_bt_st();
 	else
+#ifdef CONFIG_BT_BLUESLEEP
 		enterprise_bt_rfkill();
 	enterprise_setup_bluesleep();
+#elif defined CONFIG_BLUEDROID_PM
+		enterprise_bluedroid_pm();
+#endif
 	enterprise_emc_init();
 	enterprise_sensors_init();
 	enterprise_suspend_init();
 	enterprise_bpc_mgmt_init();
 	tegra_release_bootloader_fb();
 	tegra_serial_debug_init(TEGRA_UARTD_BASE, INT_WDT_CPU, NULL, -1, -1);
+	enterprise_vibrator_init();
 }
 
 static void __init tegra_enterprise_reserve(void)
@@ -1182,6 +1330,11 @@ static const char *enterprise_dt_board_compat[] = {
 	NULL
 };
 
+static const char *tai_dt_board_compat[] = {
+	"nvidia,tai",
+	NULL
+};
+
 MACHINE_START(TEGRA_ENTERPRISE, "tegra_enterprise")
 	.boot_params    = 0x80000100,
 	.map_io         = tegra_map_common_io,
@@ -1191,4 +1344,15 @@ MACHINE_START(TEGRA_ENTERPRISE, "tegra_enterprise")
 	.timer          = &tegra_timer,
 	.init_machine   = tegra_enterprise_init,
 	.dt_compat	= enterprise_dt_board_compat,
+MACHINE_END
+
+MACHINE_START(TAI, "tai")
+	.boot_params    = 0x80000100,
+	.map_io         = tegra_map_common_io,
+	.reserve        = tegra_enterprise_reserve,
+	.init_early	= tegra_init_early,
+	.init_irq       = tegra_init_irq,
+	.timer          = &tegra_timer,
+	.init_machine   = tegra_enterprise_init,
+	.dt_compat	= tai_dt_board_compat,
 MACHINE_END

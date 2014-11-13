@@ -75,40 +75,108 @@
 #include "baseband-xmm-power.h"
 #include "wdt-recovery.h"
 
+#ifdef CONFIG_TEGRA_THERMAL_THROTTLE
+static struct throttle_table throttle_freqs_tj[] = {
+	      /*    CPU,    CBUS,    SCLK,     EMC */
+	      { 1000000,  NO_CAP,  NO_CAP,  NO_CAP },
+	      {  760000,  NO_CAP,  NO_CAP,  NO_CAP },
+	      {  760000,  NO_CAP,  NO_CAP,  NO_CAP },
+	      {  620000,  NO_CAP,  NO_CAP,  NO_CAP },
+	      {  620000,  NO_CAP,  NO_CAP,  NO_CAP },
+	      {  620000,  437000,  NO_CAP,  NO_CAP },
+	      {  620000,  352000,  NO_CAP,  NO_CAP },
+	      {  475000,  352000,  NO_CAP,  NO_CAP },
+	      {  475000,  352000,  NO_CAP,  NO_CAP },
+	      {  475000,  352000,  250000,  375000 },
+	      {  475000,  352000,  250000,  375000 },
+	      {  475000,  247000,  204000,  375000 },
+	      {  475000,  247000,  204000,  204000 },
+	      {  475000,  247000,  204000,  204000 },
+	{ CPU_THROT_LOW,  247000,  204000,  102000 },
+};
+#endif
+
+#ifdef CONFIG_TEGRA_SKIN_THROTTLE
+static struct throttle_table throttle_freqs_tskin[] = {
+	      /*    CPU,    CBUS,    SCLK,     EMC */
+	      { 1000000,  NO_CAP,  NO_CAP,  NO_CAP },
+	      {  760000,  NO_CAP,  NO_CAP,  NO_CAP },
+	      {  760000,  NO_CAP,  NO_CAP,  NO_CAP },
+	      {  620000,  NO_CAP,  NO_CAP,  NO_CAP },
+	      {  620000,  NO_CAP,  NO_CAP,  NO_CAP },
+	      {  620000,  437000,  NO_CAP,  NO_CAP },
+	      {  620000,  352000,  NO_CAP,  NO_CAP },
+	      {  475000,  352000,  NO_CAP,  NO_CAP },
+	      {  475000,  352000,  NO_CAP,  NO_CAP },
+	      {  475000,  352000,  250000,  375000 },
+	      {  475000,  352000,  250000,  375000 },
+	      {  475000,  247000,  204000,  375000 },
+	      {  475000,  247000,  204000,  204000 },
+	      {  475000,  247000,  204000,  204000 },
+	{ CPU_THROT_LOW,  247000,  204000,  102000 },
+};
+#endif
+
 static struct balanced_throttle throttle_list[] = {
 #ifdef CONFIG_TEGRA_THERMAL_THROTTLE
 	{
 		.id = BALANCED_THROTTLE_ID_TJ,
-		.throt_tab_size = 10,
-		.throt_tab = {
-			{      0, 1000 },
-			{ 640000, 1000 },
-			{ 640000, 1000 },
-			{ 640000, 1000 },
-			{ 640000, 1000 },
-			{ 640000, 1000 },
-			{ 760000, 1000 },
-			{ 760000, 1050 },
-			{1000000, 1050 },
-			{1000000, 1100 },
-		},
+		.throt_tab_size = ARRAY_SIZE(throttle_freqs_tj),
+		.throt_tab = throttle_freqs_tj,
 	},
 #endif
 #ifdef CONFIG_TEGRA_SKIN_THROTTLE
 	{
 		.id = BALANCED_THROTTLE_ID_SKIN,
-		.throt_tab_size = 6,
-		.throt_tab = {
-			{ 640000, 1200 },
-			{ 640000, 1200 },
-			{ 760000, 1200 },
-			{ 760000, 1200 },
-			{1000000, 1200 },
-			{1000000, 1200 },
-		},
+		.throt_tab_size = ARRAY_SIZE(throttle_freqs_tskin),
+		.throt_tab = throttle_freqs_tskin,
 	},
 #endif
 };
+
+#ifdef CONFIG_TEGRA_SKIN_THROTTLE
+/* Skin timer trips */
+static struct tegra_thermal_timer_trip skin_therm_timer_trips[] = {
+	/* duration,  temp, hysteresis */
+	{       600, 48000, 5000 },
+	{      1800, 45000, 5000 },
+	{        -1, 43000, 8000 }, /* The duration -1 equals infinity. */
+};
+
+/* Skin active throttle size must be one. */
+static struct throttle_table throttle_freqs_tskin_active_0[] = {
+	      /*    CPU,    CBUS,    SCLK,     EMC */
+	      { 1200000,  NO_CAP,  NO_CAP,  NO_CAP },
+};
+
+static struct throttle_table throttle_freqs_tskin_active_1[] = {
+	      /*    CPU,    CBUS,    SCLK,     EMC */
+	      { 1000000,  NO_CAP,  NO_CAP,  NO_CAP },
+};
+
+static struct skin_therm_active_throttle skin_therm_actives[] = {
+	{
+		.bthrot = {
+			.id = BALANCED_THROTTLE_ID_SKIN + 1,
+			.throt_tab_size =
+				ARRAY_SIZE(throttle_freqs_tskin_active_0),
+			.throt_tab = throttle_freqs_tskin_active_0,
+		},
+		.trip_temp = 33000,
+		.hysteresis = 0,
+	},
+	{
+		.bthrot = {
+			.id = BALANCED_THROTTLE_ID_SKIN + 2,
+			.throt_tab_size =
+				ARRAY_SIZE(throttle_freqs_tskin_active_1),
+			.throt_tab = throttle_freqs_tskin_active_1,
+		},
+		.trip_temp = 38000,
+		.hysteresis = 0,
+	},
+};
+#endif
 
 /* All units are in millicelsius */
 static struct tegra_thermal_data thermal_data = {
@@ -131,7 +199,11 @@ static struct tegra_thermal_data thermal_data = {
 #ifdef CONFIG_TEGRA_SKIN_THROTTLE
 	.skin_device_id = THERMAL_DEVICE_ID_SKIN,
 	.temp_throttle_skin = 43000,
-	.tc1_skin = 0,
+	.skin_timer_trip_data = {
+		.trips = skin_therm_timer_trips,
+		.trip_size = ARRAY_SIZE(skin_therm_timer_trips),
+	},
+	.tc1_skin = 5,
 	.tc2_skin = 1,
 	.passive_delay_skin = 5000,
 
@@ -163,6 +235,7 @@ static struct tegra_thermal_data thermal_data = {
 #endif
 };
 
+#ifdef CONFIG_BT_BLUESLEEP
 static struct rfkill_gpio_platform_data cardhu_bt_rfkill_pdata[] = {
 	{
 		.name           = "bt_rfkill",
@@ -213,6 +286,48 @@ static noinline void __init cardhu_setup_bluesleep(void)
 	platform_device_register(&cardhu_bluesleep_device);
 	return;
 }
+#elif defined CONFIG_BLUEDROID_PM
+static struct resource cardhu_bluedroid_pm_resources[] = {
+	[0] = {
+		.name   = "shutdown_gpio",
+		.start  = TEGRA_GPIO_PU0,
+		.end    = TEGRA_GPIO_PU0,
+		.flags  = IORESOURCE_IO,
+	},
+	[1] = {
+		.name = "host_wake",
+		.flags  = IORESOURCE_IRQ | IORESOURCE_IRQ_HIGHEDGE,
+	},
+	[2] = {
+		.name = "gpio_ext_wake",
+		.start  = TEGRA_GPIO_PU1,
+		.end    = TEGRA_GPIO_PU1,
+		.flags  = IORESOURCE_IO,
+	},
+	[3] = {
+		.name = "gpio_host_wake",
+		.start  = TEGRA_GPIO_PU6,
+		.end    = TEGRA_GPIO_PU6,
+		.flags  = IORESOURCE_IO,
+	},
+};
+
+static struct platform_device cardhu_bluedroid_pm_device = {
+	.name = "bluedroid_pm",
+	.id             = 0,
+	.num_resources  = ARRAY_SIZE(cardhu_bluedroid_pm_resources),
+	.resource       = cardhu_bluedroid_pm_resources,
+};
+
+static noinline void __init cardhu_setup_bluedroid_pm(void)
+{
+	cardhu_bluedroid_pm_resources[1].start =
+		cardhu_bluedroid_pm_resources[1].end =
+				gpio_to_irq(TEGRA_GPIO_PU6);
+	platform_device_register(&cardhu_bluedroid_pm_device);
+	return;
+}
+#endif
 
 static __initdata struct tegra_clk_init_table cardhu_clk_init_table[] = {
 	/* name		parent		rate		enabled */
@@ -446,11 +561,13 @@ static void cardhu_i2c_init(void)
 	platform_device_register(&tegra_i2c_device2);
 	platform_device_register(&tegra_i2c_device1);
 
+if (0) {
 	i2c_register_board_info(4, &cardhu_codec_wm8903_info, 1);
 	i2c_register_board_info(4, &cardhu_codec_max98095_info, 1);
 	i2c_register_board_info(4, &cardhu_codec_aic326x_info, 1);
 
 	i2c_register_board_info(2, cardhu_i2c_bus3_board_info, 1);
+}
 }
 
 static struct platform_device *cardhu_uart_devices[] __initdata = {
@@ -744,16 +861,18 @@ static struct platform_device tegra_rtc_device = {
 };
 
 static struct tegra_asoc_platform_data cardhu_audio_wm8903_pdata = {
-	.gpio_spkr_en		= TEGRA_GPIO_SPKR_EN,
-	.gpio_hp_det		= TEGRA_GPIO_HP_DET,
+	.gpio_spkr_en		= -1,
+	.gpio_hp_det		= -1,
 	.gpio_hp_mute		= -1,
 	.gpio_int_mic_en	= -1,
 	.gpio_ext_mic_en	= -1,
+#if 0
 	.i2s_param[HIFI_CODEC]	= {
 		.audio_port_id	= 0,
 		.is_i2s_master	= 1,
 		.i2s_mode	= TEGRA_DAIFMT_I2S,
 	},
+#endif
 	.i2s_param[BASEBAND]	= {
 		.audio_port_id	= -1,
 	},
@@ -764,6 +883,7 @@ static struct tegra_asoc_platform_data cardhu_audio_wm8903_pdata = {
 	},
 };
 
+#if 0
 static struct tegra_asoc_platform_data cardhu_audio_max98095_pdata = {
 	.gpio_spkr_en		= -1,
 	.gpio_hp_det		= TEGRA_GPIO_HP_DET,
@@ -784,6 +904,7 @@ static struct tegra_asoc_platform_data cardhu_audio_max98095_pdata = {
 		.i2s_mode	= TEGRA_DAIFMT_DSP_A,
 	},
 };
+#endif
 
 static struct platform_device cardhu_audio_wm8903_device = {
 	.name	= "tegra-snd-wm8903",
@@ -793,6 +914,7 @@ static struct platform_device cardhu_audio_wm8903_device = {
 	},
 };
 
+#if 0
 static struct platform_device cardhu_audio_max98095_device = {
 	.name	= "tegra-snd-max98095",
 	.id	= 0,
@@ -829,6 +951,35 @@ static struct platform_device cardhu_audio_aic326x_device = {
 		.platform_data  = &cardhu_audio_aic326x_pdata,
 	},
 };
+#endif
+
+/*
+ *  BARREL: Fan Controller
+ */
+
+static struct gpio_led gpio_leds[] = {
+	{
+		.name = "fan",
+		.default_trigger = "heartbeat",
+		.gpio = TEGRA_GPIO_PJ2,
+		.active_low = 0,
+		.default_state = LEDS_GPIO_DEFSTATE_OFF,
+	}
+};
+
+static struct gpio_led_platform_data gpio_led_info = {
+	.leds = gpio_leds,
+	.num_leds = ARRAY_SIZE(gpio_leds),
+};
+
+static struct platform_device tegra_leds_gpio = {
+	.name = "leds-gpio",
+	.id = -1,
+	.dev = {
+		.platform_data = &gpio_led_info,
+	},
+};
+/**/
 
 static struct platform_device *cardhu_devices[] __initdata = {
 	&tegra_pmu_device,
@@ -858,16 +1009,21 @@ static struct platform_device *cardhu_devices[] __initdata = {
 	&spdif_dit_device,
 	&bluetooth_dit_device,
 	&baseband_dit_device,
+#ifdef CONFIG_BT_BLUESLEEP
 	&cardhu_bt_rfkill_device,
+#endif
 	&tegra_pcm_device,
 	&cardhu_audio_wm8903_device,
+#if 0
 	&cardhu_audio_max98095_device,
 	&cardhu_audio_aic326x_device,
+#endif
 	&tegra_hda_device,
 	&tegra_cec_device,
 #if defined(CONFIG_CRYPTO_DEV_TEGRA_AES)
 	&tegra_aes_device,
 #endif
+	&tegra_leds_gpio,
 };
 
 #define E1506_MXT_CONFIG_CRC 0x62F903
@@ -1271,6 +1427,7 @@ static struct tegra_usb_otg_data tegra_otg_pdata = {
 #if defined(CONFIG_USB_SUPPORT)
 static void cardhu_usb_init(void)
 {
+	int ret = 0;
 	struct board_info bi;
 
 	tegra_get_board_info(&bi);
@@ -1303,6 +1460,10 @@ static void cardhu_usb_init(void)
 	tegra_ehci3_device.dev.platform_data = &tegra_ehci3_utmi_pdata;
 	platform_device_register(&tegra_ehci3_device);
 
+	ret |= gpio_request(TEGRA_GPIO_PDD5, "smsc-reset");
+	ret |= gpio_direction_output(TEGRA_GPIO_PDD5, 0);
+	msleep(1);
+	gpio_set_value(TEGRA_GPIO_PDD5, 1);
 }
 #else
 static void cardhu_usb_init(void) { }
@@ -1440,7 +1601,7 @@ static void __init tegra_cardhu_init(void)
 	cardhu_edp_init();
 #endif
 	cardhu_uart_init();
-	tegra_camera_init();
+if (0)	tegra_camera_init();
 	platform_add_devices(cardhu_devices, ARRAY_SIZE(cardhu_devices));
 	tegra_ram_console_debug_init();
 	tegra_io_dpd_init();
@@ -1448,21 +1609,25 @@ static void __init tegra_cardhu_init(void)
 	cardhu_regulator_init();
 	cardhu_dtv_init();
 	cardhu_suspend_init();
-	cardhu_touch_init();
-	cardhu_modem_init();
+if (0)	cardhu_touch_init();
+if (0)	cardhu_modem_init();
 	cardhu_kbc_init();
-	cardhu_scroll_init();
+if (0)	cardhu_scroll_init();
 	cardhu_keys_init();
 	cardhu_panel_init();
-	cardhu_pmon_init();
+if (0)	cardhu_pmon_init();
 	cardhu_sensors_init();
+#ifdef CONFIG_BT_BLUESLEEP
 	cardhu_setup_bluesleep();
+#elif defined CONFIG_BLUEDROID_PM
+	cardhu_setup_bluedroid_pm();
+#endif
 	cardhu_sata_init();
 	//audio_wired_jack_init();
 	cardhu_pins_state_init();
 	cardhu_emc_init();
 	tegra_release_bootloader_fb();
-	cardhu_pci_init();
+if (0)	cardhu_pci_init();
 #ifdef CONFIG_TEGRA_WDT_RECOVERY
 	tegra_wdt_recovery_init();
 #endif

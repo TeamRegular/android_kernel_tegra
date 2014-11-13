@@ -270,7 +270,16 @@ static int tegra_fb_blank(int blank, struct fb_info *info)
 		dev_dbg(&tegra_fb->ndev->dev, "blank - powerdown\n");
 		tegra_dc_disable(tegra_fb->win->dc);
 		return 0;
-
+#ifdef CONFIG_PM
+    case FB_BLANK_RESUME:
+        dev_dbg(&tegra_fb->ndev->dev, "blank - resume\n");
+        tegra_dc_resume(tegra_fb->ndev);
+        return 0;
+    case FB_BLANK_SUSPEND:
+        dev_dbg(&tegra_fb->ndev->dev, "blank - suspend\n");
+        tegra_dc_suspend(tegra_fb->ndev, PMSG_SUSPEND);
+        return 0;
+#endif
 	default:
 		return -ENOTTY;
 	}
@@ -326,6 +335,7 @@ static void tegra_fb_imageblit(struct fb_info *info,
 static int tegra_fb_ioctl(struct fb_info *info, unsigned int cmd, unsigned long arg)
 {
 	struct tegra_fb_info *tegra_fb = (struct tegra_fb_info *)info->par;
+	struct tegra_dc *dc = tegra_fb->win->dc;
 	struct tegra_fb_modedb modedb;
 	struct fb_modelist *modelist;
 	struct fb_vblank vblank = {};
@@ -348,6 +358,8 @@ static int tegra_fb_ioctl(struct fb_info *info, unsigned int cmd, unsigned long 
 			memset(&var, 0x0, sizeof(var));
 
 			fb_videomode_to_var(&var, &modelist->mode);
+			var.width = tegra_dc_get_out_width(dc);
+			var.height = tegra_dc_get_out_height(dc);
 
 			if (copy_to_user((void __user *)&modedb.modedb[i],
 					 &var, sizeof(var)))

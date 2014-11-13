@@ -45,6 +45,7 @@
 #include "tegra3_tsensor.h"
 #include "wakeups.h"
 #include "wakeups-t3.h"
+#include "fuse.h"
 
 #define PMC_CTRL		0x0
 #define PMC_CTRL_INTR_LOW	(1 << 17)
@@ -1226,6 +1227,9 @@ int __init cardhu_edp_init(void)
 	if (!regulator_mA) {
 		regulator_mA = 6000; /* regular T30/s */
 	}
+	if (5 == tegra_cpu_speedo_id()) {
+		regulator_mA = 10000; /* T33: 10A */
+	}
 	pr_info("%s: CPU regulator %d mA\n", __func__, regulator_mA);
 
 	tegra_init_cpu_edp_limits(regulator_mA);
@@ -1258,7 +1262,8 @@ static int __init cardhu_charger_late_init(void)
 	if (!machine_is_cardhu())
 		return 0;
 
-	platform_device_register(&cardhu_charger_device);
+	if(0) platform_device_register(&cardhu_charger_device);
+	
 	return 0;
 }
 
