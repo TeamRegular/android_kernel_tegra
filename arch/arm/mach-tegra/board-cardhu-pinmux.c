@@ -394,7 +394,7 @@ static __initdata struct tegra_pingroup_config cardhu_pinmux_common[] = {
 	DEFAULT_PINMUX(PEX_L0_CLKREQ_N, PCIE,            NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(PEX_WAKE_N,      PCIE,            NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(PEX_L1_PRSNT_N,  PCIE,            NORMAL,    NORMAL,     INPUT),
-	DEFAULT_PINMUX(PEX_L1_RST_N,    PCIE,            NORMAL,    NORMAL,     OUTPUT),
+	DEFAULT_PINMUX(PEX_L1_RST_N,    PCIE,            PULL_UP,   NORMAL,     OUTPUT),
 	DEFAULT_PINMUX(PEX_L1_CLKREQ_N, PCIE,            NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(PEX_L2_PRSNT_N,  PCIE,            NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(PEX_L2_RST_N,    PCIE,            NORMAL,    NORMAL,     OUTPUT),
@@ -473,6 +473,7 @@ static __initdata struct tegra_pingroup_config cardhu_pinmux_cardhu_a03[] = {
 	DEFAULT_PINMUX(LCD_CS1_N,       DISPLAYA,        NORMAL,    NORMAL,     INPUT),
 	DEFAULT_PINMUX(LCD_M1,          DISPLAYA,        NORMAL,    NORMAL,     INPUT),
 
+	DEFAULT_PINMUX(GMI_CS1_N,       RSVD1,           NORMAL,    NORMAL,     OUTPUT),
 	DEFAULT_PINMUX(GMI_CS2_N,       RSVD1,           PULL_UP,   NORMAL,     INPUT),
 	DEFAULT_PINMUX(GMI_AD8,         PWM0,            NORMAL,    NORMAL,     OUTPUT),
 	DEFAULT_PINMUX(GMI_AD10,        NAND,            NORMAL,    NORMAL,     OUTPUT),
@@ -495,6 +496,9 @@ static __initdata struct tegra_pingroup_config cardhu_pinmux_e1291_a04[] = {
 
 	/*PCIE dock detect*/
 	DEFAULT_PINMUX(GPIO_PU4,        RSVD1,           PULL_UP,   NORMAL,     INPUT),
+
+	/* For DDR strappin reading */
+	DEFAULT_PINMUX(GMI_AD4,         RSVD1,           NORMAL,     TRISTATE,   INPUT),
 };
 
 static __initdata struct tegra_pingroup_config cardhu_pinmux_e1198[] = {
@@ -762,7 +766,10 @@ int __init cardhu_pinmux_init(void)
 		.is_input	= _is_input,	\
 		.value		= _value,	\
 	}
-
+/*
+ *  BARREL
+ */	
+#if 0
 struct gpio_init_pin_info pin_lpm_cardhu_common[] = {
 	PIN_GPIO_LPM("GMI_CS3_N", TEGRA_GPIO_PK4, 0, 0),
 	PIN_GPIO_LPM("GMI_CS4_N", TEGRA_GPIO_PK2, 1, 0),
@@ -771,6 +778,17 @@ struct gpio_init_pin_info pin_lpm_cardhu_common[] = {
 	PIN_GPIO_LPM("GMI_CS1",   TEGRA_GPIO_PJ2, 1, 0),
 	PIN_GPIO_LPM("GMI_WP_N",  TEGRA_GPIO_PC7, 1, 0),
 };
+#else
+struct gpio_init_pin_info pin_lpm_cardhu_common[] = {
+	PIN_GPIO_LPM("GMI_CS3_N", TEGRA_GPIO_PK4, 0, 0),
+	PIN_GPIO_LPM("GMI_CS4_N", TEGRA_GPIO_PK2, 1, 0),
+	PIN_GPIO_LPM("GMI_CS7",   TEGRA_GPIO_PI6, 1, 0),
+	PIN_GPIO_LPM("GMI_CS0",   TEGRA_GPIO_PJ0, 1, 0),
+	PIN_GPIO_LPM("GMI_WP_N",  TEGRA_GPIO_PC7, 1, 0),
+	/* BARREL: Let SIP module keep awake */
+	PIN_GPIO_LPM("LCD_PWR0", TEGRA_GPIO_PB2, 0, 1),
+};
+#endif
 
 /* E1198 without PM313 display board */
 struct gpio_init_pin_info pin_lpm_cardhu_common_wo_pm313[] = {

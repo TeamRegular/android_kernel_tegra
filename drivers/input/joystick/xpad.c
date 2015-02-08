@@ -79,6 +79,8 @@
 #include <linux/stat.h>
 #include <linux/module.h>
 #include <linux/usb/input.h>
+#define CREATE_TRACE_POINTS
+#include <trace/events/joystick.h>
 
 #define DRIVER_AUTHOR "Marko Friedemann <mfr@bmx-chemnitz.de>"
 #define DRIVER_DESC "X-Box pad driver"
@@ -124,6 +126,8 @@ static const struct xpad_device {
 	{ 0x045e, 0x0719, "Xbox 360 Wireless Receiver", MAP_DPAD_TO_BUTTONS, XTYPE_XBOX360W },
 	{ 0x0c12, 0x8809, "RedOctane Xbox Dance Pad", DANCEPAD_MAP_CONFIG, XTYPE_XBOX },
 	{ 0x044f, 0x0f07, "Thrustmaster, Inc. Controller", 0, XTYPE_XBOX },
+	{ 0x24c6, 0x5b02, "Thrustmaster, Inc. GPX Controller", 0, XTYPE_XBOX360 },
+	{ 0x044f, 0xb326, "Thrustmaster Gamepad GP XID", 0, XTYPE_XBOX360 },
 	{ 0x046d, 0xc242, "Logitech Chillstream Controller", 0, XTYPE_XBOX360 },
 	{ 0x046d, 0xca84, "Logitech Xbox Cordless Controller", 0, XTYPE_XBOX },
 	{ 0x046d, 0xca88, "Logitech Compact Controller for Xbox", 0, XTYPE_XBOX },
@@ -480,16 +484,20 @@ static void xpad_irq_in(struct urb *urb)
 
 	switch (xpad->xtype) {
 	case XTYPE_XBOX360:
+		trace_joystick_irq("Joystick_xpad360_process_packet");
 		xpad360_process_packet(xpad, 0, xpad->idata);
 		break;
 	case XTYPE_XBOX360W:
+		trace_joystick_irq("Joystick_xpad360w_process_packet");
 		xpad360w_process_packet(xpad, 0, xpad->idata);
 		break;
 	default:
+		trace_joystick_irq("Joystick_xpad_process_packet");
 		xpad_process_packet(xpad, 0, xpad->idata);
 	}
 
 exit:
+	trace_joystick_irq("Joystick_xpad_usb_submit_urb");
 	retval = usb_submit_urb(urb, GFP_ATOMIC);
 	if (retval)
 		err ("%s - usb_submit_urb failed with result %d",

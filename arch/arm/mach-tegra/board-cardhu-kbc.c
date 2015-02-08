@@ -180,6 +180,7 @@ static struct gpio_keys_button cardhu_keys_e1291[] = {
 };
 
 static struct gpio_keys_button cardhu_keys_e1291_a04[] = {
+#if 0
 	[0] = GPIO_KEY(KEY_VOLUMEDOWN, PR0, 0),
 	[1] = GPIO_KEY(KEY_VOLUMEUP, PR1, 0),
 	[2] = GPIO_KEY(KEY_HOME, PQ2, 0),
@@ -189,6 +190,9 @@ static struct gpio_keys_button cardhu_keys_e1291_a04[] = {
 	[6] = GPIO_KEY(KEY_RESERVED, PV0, 1),
 	[7] = GPIO_IKEY(KEY_POWER, TPS6591X_IRQ_BASE + TPS6591X_INT_PWRON, 1, 100),
 	[8] = GPIO_SW_KEY(SW_LID, TPS6591X_GPIO_5, 0),
+#else
+	[0] = GPIO_KEY(KEY_POWER, PV0, 1),
+#endif 
 };
 
 static struct gpio_keys_platform_data cardhu_keys_e1291_pdata = {

@@ -22,6 +22,7 @@
 #include <linux/kobject.h>
 #include <linux/err.h>
 #include <linux/time.h>
+#include <linux/pm_qos_params.h>
 
 #include "clock.h"
 #include "dvfs.h"
@@ -357,10 +358,12 @@ static struct dvfs core_dvfs_table[] = {
 	CORE_DVFS("disp1",  2, 0, KHZ,   155000, 155000, 268000, 268000, 268000, 268000,  268000,   268000,  268000),
 	CORE_DVFS("disp1",  3, 0, KHZ,        1, 120000, 120000, 120000, 120000, 190000,  190000,   190000,  190000),
 
+#ifndef PRIMARY_DISP_HDMI
 	CORE_DVFS("disp2",  0, 0, KHZ,        1, 120000, 120000, 120000, 120000, 190000,  190000,   190000,  190000),
 	CORE_DVFS("disp2",  1, 0, KHZ,   155000, 155000, 268000, 268000, 268000, 268000,  268000,   268000,  268000),
 	CORE_DVFS("disp2",  2, 0, KHZ,   155000, 155000, 268000, 268000, 268000, 268000,  268000,   268000,  268000),
 	CORE_DVFS("disp2",  3, 0, KHZ,        1, 120000, 120000, 120000, 120000, 190000,  190000,   190000,  190000),
+#endif
 
 	CORE_DVFS("pwm",   -1, 1, KHZ,   204000, 408000, 408000, 408000, 408000, 408000,  408000,   408000,  408000),
 };
@@ -815,9 +818,9 @@ static DEFINE_MUTEX(core_cap_lock);
 struct core_cap {
 	int refcnt;
 	int level;
+	struct pm_qos_request_list request;
 };
 static struct core_cap tegra3_core_cap;
-static struct core_cap kdvfs_core_cap;
 static struct core_cap user_core_cap;
 
 static struct core_cap user_cbus_cap;
@@ -866,8 +869,6 @@ static void core_cap_update(void)
 {
 	int new_level = tegra3_dvfs_rail_vdd_core.max_millivolts;
 
-	if (kdvfs_core_cap.refcnt)
-		new_level = min(new_level, kdvfs_core_cap.level);
 	if (user_core_cap.refcnt)
 		new_level = min(new_level, user_core_cap.level);
 
@@ -940,24 +941,6 @@ core_cap_level_store(struct kobject *kobj, struct kobj_attribute *attr,
 	return count;
 }
 
-static void cbus_cap_update(void)
-{
-	static struct clk *cbus_cap;
-
-	if (!cbus_cap) {
-		cbus_cap = tegra_get_clock_by_name("cap.profile.cbus");
-		if (!cbus_cap) {
-			WARN_ONCE(1, "tegra3_dvfs: cbus profiling is not supported");
-			return;
-		}
-	}
-
-	if (user_cbus_cap.refcnt)
-		clk_set_rate(cbus_cap, user_cbus_cap.level);
-	else
-		clk_set_rate(cbus_cap, clk_get_max_rate(cbus_cap));
-}
-
 static ssize_t
 cbus_cap_state_show(struct kobject *kobj, struct kobj_attribute *attr,
 		    char *buf)
@@ -978,11 +961,12 @@ cbus_cap_state_store(struct kobject *kobj, struct kobj_attribute *attr,
 	if (state) {
 		user_cbus_cap.refcnt++;
 		if (user_cbus_cap.refcnt == 1)
-			cbus_cap_update();
+			pm_qos_add_request(&user_cbus_cap.request,
+				PM_QOS_CBUS_FREQ_MAX, user_cbus_cap.level);
 	} else if (user_cbus_cap.refcnt) {
 		user_cbus_cap.refcnt--;
 		if (user_cbus_cap.refcnt == 0)
-			cbus_cap_update();
+			pm_qos_remove_request(&user_cbus_cap.request);
 	}
 
 	mutex_unlock(&core_cap_lock);
@@ -1006,7 +990,9 @@ cbus_cap_level_store(struct kobject *kobj, struct kobj_attribute *attr,
 
 	mutex_lock(&core_cap_lock);
 	user_cbus_cap.level = level;
-	cbus_cap_update();
+	if (user_cbus_cap.refcnt)
+		pm_qos_update_request(&user_cbus_cap.request,
+			user_cbus_cap.level);
 	mutex_unlock(&core_cap_lock);
 	return count;
 }
@@ -1027,30 +1013,6 @@ const struct attribute *cap_attributes[] = {
 	&cbus_level_attribute.attr,
 	NULL,
 };
-
-void tegra_dvfs_core_cap_enable(bool enable)
-{
-	mutex_lock(&core_cap_lock);
-
-	if (enable) {
-		kdvfs_core_cap.refcnt++;
-		if (kdvfs_core_cap.refcnt == 1)
-			core_cap_enable(true);
-	} else if (kdvfs_core_cap.refcnt) {
-		kdvfs_core_cap.refcnt--;
-		if (kdvfs_core_cap.refcnt == 0)
-			core_cap_enable(false);
-	}
-	mutex_unlock(&core_cap_lock);
-}
-
-void tegra_dvfs_core_cap_level_set(int level)
-{
-	mutex_lock(&core_cap_lock);
-	kdvfs_core_cap.level = level;
-	core_cap_update();
-	mutex_unlock(&core_cap_lock);
-}
 
 static int __init init_core_cap_one(struct clk *c, unsigned long *freqs)
 {
@@ -1095,12 +1057,69 @@ static int __init init_core_cap_one(struct clk *c, unsigned long *freqs)
 	return 0;
 }
 
+static int max_cbus_notify(struct notifier_block *nb, unsigned long n, void *p)
+{
+	static struct clk *clk;
+	int freq = pm_qos_request(PM_QOS_CBUS_FREQ_MAX);
+
+	if (!clk) {
+		clk = tegra_get_clock_by_name("cap.profile.cbus");
+		if (!clk) {
+			WARN_ONCE(1, "tegra3_dvfs: cbus profiling is not supported");
+			return NOTIFY_OK;
+		}
+	}
+
+	clk_set_rate(clk, freq);
+
+	return NOTIFY_OK;
+}
+
+static int min_cbus_notify(struct notifier_block *nb, unsigned long n, void *p)
+{
+	static struct clk *clk;
+	int default_freq = PM_QOS_CBUS_FREQ_MIN_DEFAULT_VALUE;
+	int freq = pm_qos_request(PM_QOS_CBUS_FREQ_MIN);
+	bool enabled, to_enable, to_disable;
+
+	if (!clk) {
+		clk = tegra_get_clock_by_name("floor.profile.cbus");
+		if (!clk) {
+			WARN_ONCE(1, "tegra3_dvfs: cbus floor is not supported");
+			return NOTIFY_OK;
+		}
+	}
+
+	enabled = tegra_is_clk_enabled(clk);
+	to_disable = (freq == default_freq) && enabled;
+	to_enable = (freq != default_freq) && !enabled;
+
+	if (to_enable) {
+		clk_set_rate(clk, freq);
+		clk_enable(clk);
+	} else if (to_disable) {
+		clk_disable(clk);
+		clk_set_rate(clk, freq);
+	} else
+		clk_set_rate(clk, freq);
+
+	return NOTIFY_OK;
+}
+
+static struct notifier_block max_cbus_notifier = {
+	.notifier_call = max_cbus_notify,
+};
+
+static struct notifier_block min_cbus_notifier = {
+	.notifier_call = min_cbus_notify,
+};
+
 static int __init tegra_dvfs_init_core_cap(void)
 {
 	int i;
 	struct clk *c = NULL;
 
-	tegra3_core_cap.level = kdvfs_core_cap.level = user_core_cap.level =
+	tegra3_core_cap.level = user_core_cap.level =
 		tegra3_dvfs_rail_vdd_core.max_millivolts;
 
 	for (i = 0; i < ARRAY_SIZE(core_cap_table); i++) {
@@ -1119,6 +1138,14 @@ static int __init tegra_dvfs_init_core_cap(void)
 		pr_err("tegra3_dvfs: failed to create sysfs cap object");
 		return 0;
 	}
+
+	if (pm_qos_add_notifier(PM_QOS_CBUS_FREQ_MIN, &min_cbus_notifier))
+		pr_err("%s: Failed to register min cbus PM QoS notifier\n",
+			__func__);
+
+	if (pm_qos_add_notifier(PM_QOS_CBUS_FREQ_MAX, &max_cbus_notifier))
+		pr_err("%s: Failed to register max cbus PM QoS notifier\n",
+			__func__);
 
 	if (sysfs_create_files(cap_kobj, cap_attributes)) {
 		pr_err("tegra3_dvfs: failed to create sysfs cap interface");
